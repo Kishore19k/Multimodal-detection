@@ -2,9 +2,10 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
-import cv2
 import os
 
+import cv2
+st.write(cv2.__version__)
 from ultralytics import YOLO
 
 # Create temp folder if not exists
