@@ -1,9 +1,10 @@
 streamlit
-numpy
+numpy==1.26.4
 pandas
-opencv-python-headless
+opencv-python-headless==4.10.0.84
 joblib
 ultralytics==8.4.62
-tensorflow
 pillow
 matplotlib
+torch
+torchvision
