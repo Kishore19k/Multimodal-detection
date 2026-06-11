@@ -24,18 +24,38 @@ st.title(
 @st.cache_resource
 def load_models():
 
-    rf_model = joblib.load(
-        "models/csv_risk_model.pkl"
-    )
+    try:
+        rf_model = joblib.load(
+            "models/csv_risk_model.pkl"
+        )
 
-    yolo_model = YOLO(
-        "models/best.pt"
-    )
+    except Exception as e:
+
+        st.error(
+            f"RF Model Error: {e}"
+        )
+
+        st.stop()
+
+    try:
+        yolo_model = YOLO(
+            "models/best.pt"
+        )
+
+    except Exception as e:
+
+        st.error(
+            f"YOLO Model Error: {e}"
+        )
+
+        st.stop()
 
     return rf_model, yolo_model
 
 
 rf_model, yolo_model = load_models()
+
+
 
 # Upload section
 csv_file = st.file_uploader(
