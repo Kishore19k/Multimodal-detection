@@ -4,6 +4,6 @@ pandas
 opencv-python-headless
 joblib
 ultralytics==8.4.62
-tensorflow==2.19.0
+tensorflow
 pillow
 matplotlib
