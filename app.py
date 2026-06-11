@@ -3,8 +3,12 @@ import pandas as pd
 import numpy as np
 import joblib
 import cv2
+import os
 
 from ultralytics import YOLO
+
+# Create temp folder if not exists
+os.makedirs("temp", exist_ok=True)
 
 st.set_page_config(
     page_title="Multimodal Accident Risk Assessment",
@@ -15,7 +19,7 @@ st.title(
     "Multimodal Accident Risk Assessment System"
 )
 
-#Load models
+# Load models
 @st.cache_resource
 def load_models():
 
@@ -29,9 +33,10 @@ def load_models():
 
     return rf_model, yolo_model
 
+
 rf_model, yolo_model = load_models()
 
-#Upload section
+# Upload section
 csv_file = st.file_uploader(
     "Upload Environmental CSV",
     type=["csv"]
@@ -39,97 +44,118 @@ csv_file = st.file_uploader(
 
 image_file = st.file_uploader(
     "Upload Traffic Sign Image",
-    type=["jpg","jpeg","png"]
+    type=["jpg", "jpeg", "png"]
 )
 
-#Analyze button
+# Analyze button
 if st.button("Analyze"):
 
+    # Check uploads
+    if csv_file is None:
+        st.error("Please upload CSV file")
+        st.stop()
 
-#csv prediction
-df = pd.read_csv(csv_file)
+    if image_file is None:
+        st.error("Please upload Traffic Sign Image")
+        st.stop()
 
-csv_score = float(
-    rf_model.predict(df)[0]
-)
+    # CSV Prediction
+    df = pd.read_csv(csv_file)
 
-#yolo prediction
-with open(
-    "temp/test.jpg",
-    "wb"
-) as f:
-
-    f.write(
-        image_file.read()
+    csv_score = float(
+        rf_model.predict(df)[0]
     )
 
-results = yolo_model.predict(
-    source="temp/test.jpg",
-    conf=0.25,
-    verbose=False
-)
+    # Save uploaded image
+    image_path = "temp/test.jpg"
 
-#confidence
-boxes = results[0].boxes
+    with open(image_path, "wb") as f:
+        f.write(image_file.read())
 
-if len(boxes) > 0:
-
-    sign_score = float(
-        boxes.conf.max()
+    # YOLO Prediction
+    results = yolo_model.predict(
+        source=image_path,
+        conf=0.25,
+        verbose=False
     )
 
-    class_id = int(
-        boxes.cls[0]
+    boxes = results[0].boxes
+
+    if len(boxes) > 0:
+
+        sign_score = float(
+            boxes.conf.max().cpu().numpy()
+        )
+
+        class_id = int(
+            boxes.cls[0].cpu().numpy()
+        )
+
+        sign_name = yolo_model.names[class_id]
+
+        annotated = results[0].plot()
+
+        annotated = cv2.cvtColor(
+            annotated,
+            cv2.COLOR_BGR2RGB
+        )
+
+    else:
+
+        sign_score = 0.0
+        sign_name = "No Sign Detected"
+        annotated = cv2.imread(image_path)
+        annotated = cv2.cvtColor(
+            annotated,
+            cv2.COLOR_BGR2RGB
+        )
+
+    # Fusion
+    final_score = (
+        0.5 * csv_score +
+        0.5 * sign_score
     )
 
-    sign_name = (
-        yolo_model.names[class_id]
+    # Risk Level
+    if final_score > 0.7:
+        risk = "HIGH"
+
+    elif final_score > 0.4:
+        risk = "MEDIUM"
+
+    else:
+        risk = "LOW"
+
+    # Results
+    st.subheader("Results")
+
+    st.write(
+        "Environmental Risk Score:",
+        round(csv_score, 4)
     )
 
-else:
+    st.write(
+        "Traffic Sign:",
+        sign_name
+    )
 
-    sign_score = 0
+    st.write(
+        "Traffic Sign Confidence:",
+        round(sign_score, 4)
+    )
 
-    sign_name = "No Sign"
+    st.write(
+        "Final Risk Score:",
+        round(final_score, 4)
+    )
 
-#fusion
-final_score = (
-    0.5 * csv_score +
-    0.5 * sign_score
-)
+    st.write(
+        "Risk Level:",
+        risk
+    )
 
-#risk level
-if final_score > 0.7:
-
-    risk = "HIGH"
-
-elif final_score > 0.4:
-
-    risk = "MEDIUM"
-
-else:
-
-    risk = "LOW"
-
-#output
-st.subheader("Results")
-
-st.write(
-    "Environmental Risk Score:",
-    round(csv_score,4)
-)
-
-st.write(
-    "Traffic Sign:",
-    sign_name
-)
-
-st.write(
-    "Traffic Sign Confidence:",
-    round(sign_score,4)
-)
-
-st.write(
-    "Risk Level:",
-    risk
-)
+    st.image(
+        annotated,
+        caption="Traffic Sign Detection",
+        use_container_width=True
+    )
